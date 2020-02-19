@@ -203,7 +203,9 @@ mri_exception_exit:
 	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
 	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
 	addi sp, sp, ENTRY_STACK_NUM_ELEMENTS*REGISTER_SIZE
-#endif	
+#endif
+.global mri_exception_mret  // declaring this as a global just so we can set a breakpoint more easily to debug
+mri_exception_mret:	
 	mret
 	
 
