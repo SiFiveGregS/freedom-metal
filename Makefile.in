@@ -208,6 +208,7 @@ am_libmetal_a_OBJECTS = src/drivers/fixed-clock.$(OBJEXT) \
 	src/drivers/inline.$(OBJEXT) \
 	src/drivers/riscv_clint0.$(OBJEXT) \
 	src/drivers/riscv_cpu.$(OBJEXT) \
+	src/drivers/riscv_mri.$(OBJEXT) \
 	src/drivers/riscv_plic0.$(OBJEXT) \
 	src/drivers/sifive_ccache0.$(OBJEXT) \
 	src/drivers/sifive_clic0.$(OBJEXT) \

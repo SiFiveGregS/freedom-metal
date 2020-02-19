@@ -100,6 +100,7 @@ libmetal_a_SOURCES = \
 	src/drivers/inline.c \
 	src/drivers/riscv_clint0.c \
 	src/drivers/riscv_cpu.c \
+	src/drivers/riscv_mri.S \
 	src/drivers/riscv_plic0.c \
 	src/drivers/sifive_ccache0.c \
 	src/drivers/sifive_clic0.c \

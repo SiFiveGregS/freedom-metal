@@ -163,12 +163,20 @@ metal_external_interrupt_vector_handler(void) {
     __METAL_IRQ_VECTOR_HANDLER(METAL_INTERRUPT_ID_EXT);
 }
 
-void __metal_exception_handler(void) __attribute__((interrupt, aligned(128)));
+void __metal_exception_handler(void) __attribute__((naked, aligned(128)));
 void __metal_exception_handler(void) {
+  __asm__ volatile("j mri_exception_entry");  /* This will then jump to __metal_original_exception_handler */
+}
+
+void __metal_original_exception_handler(void) __attribute__((interrupt, aligned(128)));
+void __metal_original_exception_handler(void) {
     int id;
     void *priv;
     uintptr_t mcause, mepc, mtval, mtvec;
     struct __metal_driver_riscv_cpu_intc *intc;
+    extern int mri_context;
+    int *p_mri_context = (int*)&mri_context;
+    int exit_via_mri = *p_mri_context & 0x1;
     struct __metal_driver_cpu *cpu = __metal_cpu_table[__metal_myhart_id()];
 
     __asm__ volatile("csrr %0, mcause" : "=r"(mcause));
@@ -185,6 +193,9 @@ void __metal_exception_handler(void) {
                 ((mtvec & METAL_MTVEC_MASK) == METAL_MTVEC_DIRECT)) {
                 priv = intc->metal_int_table[id].exint_data;
                 intc->metal_int_table[id].handler(id, priv);
+		if (exit_via_mri) {
+		  __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
+		}
                 return;
             }
             if ((mtvec & METAL_MTVEC_MASK) == METAL_MTVEC_CLIC) {
@@ -195,11 +206,18 @@ void __metal_exception_handler(void) {
                 priv = intc->metal_int_table[METAL_INTERRUPT_ID_SW].sub_int;
                 mtvt_handler = (metal_interrupt_handler_t) * (uintptr_t *)mtvt;
                 mtvt_handler(id, priv);
+		if (exit_via_mri) {
+		  __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
+		}
                 return;
             }
         } else {
             intc->metal_exception_table[id]((struct metal_cpu *)cpu, id);
         }
+    }
+
+    if (exit_via_mri) {
+      __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
     }
 }
 
