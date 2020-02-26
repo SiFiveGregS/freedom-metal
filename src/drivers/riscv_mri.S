@@ -19,7 +19,17 @@
 #define ELEMENT_TO_OFFSET(idx) idx*REGISTER_SIZE
 	
 
-#define MRI_CONTEXT_NUM_ELEMENTS 33  // flags, x1-x31, mepc
+#define MRI_CONTEXT_NUM_ELEMENTS 39
+	/* offset 0: flags
+	offset 1 - 31: x1-x31
+	offset 32: mepc
+	offset 33: mcause
+	offset 34: mstatus
+	offset 35: reentered
+	offset 36: reentered_mepc
+	offset 37: reentered_mcause
+	offset 38: reentered_mstatus
+	*/
 
 // stack usage has to maintain 16 byte alignment in order to play well with the RISC-V C ABI
 #define ENTRY_STACK_FRAME_SIZE_BYTES 32
@@ -51,17 +61,44 @@ mri_exception_entry:
 	// borrow t1 to hold flags, branch past the context save logic if debug is already active
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
 	andi t1, t1, 1
-	bne zero, t1, 1f
+	beq zero, t1, 2f
+	// this must be a recursive entry; save mepc, mcause, mstatus in a separate place from the non-reentrant values
 
+	// set reentered flag
+	li t1, 1
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)	
+	
+	csrr t1, mepc
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)
+
+	csrr t1, mcause
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)	
+
+	csrr t1, mstatus
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(38)(t0)	
+	
+
+	j 1f	
+
+2:	
 	// set active flag in context
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
 	ori t1, t1, 1
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)
 
+	// clear reentered flag
+	REGISTER_STORE x0, ELEMENT_TO_OFFSET(35)(t0)
+	
 	// save MEPC so we can restore even if the debug agent triggers a nested exception
 	//  which would ordinarily clobber MEPC (also so that debugger can modify the pc)
 	csrr t1, mepc
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(32)(t0)	
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(32)(t0)
+
+	csrr t1, mcause
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(33)(t0)	
+
+	csrr t1, mstatus
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(33)(t0)	
 
 	// save x1/ra (still in place) to context
 	REGISTER_STORE x1, ELEMENT_TO_OFFSET(1)(t0)
