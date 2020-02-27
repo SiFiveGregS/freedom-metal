@@ -98,7 +98,7 @@ mri_exception_entry:
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(33)(t0)	
 
 	csrr t1, mstatus
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(33)(t0)	
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(34)(t0)	
 
 	// save x1/ra (still in place) to context
 	REGISTER_STORE x1, ELEMENT_TO_OFFSET(1)(t0)
