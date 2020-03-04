@@ -19,31 +19,27 @@
 #define ELEMENT_TO_OFFSET(idx) idx*REGISTER_SIZE
 	
 
-#define MRI_CONTEXT_NUM_ELEMENTS 39
-	/* offset 0: flags
-	offset 1 - 31: x1-x31
-	offset 32: mepc
-	offset 33: mcause
-	offset 34: mstatus
-	offset 35: reentered
-	offset 36: reentered_mepc
-	offset 37: reentered_mcause
-	offset 38: reentered_mstatus
-	*/
+/* mri_context layout in C terms, for reference.
+(where RISCV_X_VAL is uint32_t for RV32, and uint64_t for RV64):
+	
+typedef struct {
+  RISCV_X_VAL flags;
+  RISCV_X_VAL x_1_31[31];  // Not including x0!  Its value is fixed at zero always, of course.
+  RISCV_X_VAL mepc;
+  RISCV_X_VAL mcause;
+  RISCV_X_VAL mstatus;  
+  RISCV_X_VAL reentered;  
+  RISCV_X_VAL reentered_mepc;
+  RISCV_X_VAL reentered_mcause;
+  RISCV_X_VAL reentered_mstatus;  
+} MRI_CONTEXT_RISCV;
+*/	
 
 // stack usage has to maintain 16 byte alignment in order to play well with the RISC-V C ABI
 #define ENTRY_STACK_FRAME_SIZE_BYTES 32
 #define ENTRY_STACK_NUM_ELEMENTS ENTRY_STACK_FRAME_SIZE_BYTES/REGISTER_SIZE
 #define ENTRY_STACK_ELEM_SP_OFFSET(idx) (ENTRY_STACK_NUM_ELEMENTS-(idx+1)) * REGISTER_SIZE
 	
-
-	.bss
-.global mri_context	
-mri_context:
-	.rept MRI_CONTEXT_NUM_ELEMENTS
-	// element 0 is flags (bit 0 means debug is active)
-	REGISTER_TYPE 0
-	.endr
 
 
 	.text
