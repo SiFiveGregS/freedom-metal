@@ -61,30 +61,27 @@ mri_exception_entry:
 	// this must be a recursive entry; save mepc, mcause, mstatus in a separate place from the non-reentrant values
 
 	// set reentered flag
-	li t1, 1
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)	
+	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)	
+	ori t1, t1, 8
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)	
 	
 	csrr t1, mepc
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)
 
 	csrr t1, mcause
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)	
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)	
 
 	csrr t1, mstatus
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(38)(t0)	
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)	
 	
 
 	j 1f	
 
 2:	
-	// set active flag in context
-	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
-	ori t1, t1, 1
+	// set active flag in context, clear all other flags
+	ori t1, zero, 1
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)
 
-	// clear reentered flag
-	REGISTER_STORE x0, ELEMENT_TO_OFFSET(35)(t0)
-	
 	// save MEPC so we can restore even if the debug agent triggers a nested exception
 	//  which would ordinarily clobber MEPC (also so that debugger can modify the pc)
 	csrr t1, mepc

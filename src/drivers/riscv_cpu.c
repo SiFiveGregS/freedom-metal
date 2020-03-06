@@ -176,7 +176,7 @@ void __metal_original_exception_handler(void) {
     struct __metal_driver_riscv_cpu_intc *intc;
     extern int mri_context;
     int *p_mri_context = (int*)&mri_context;
-    int exit_via_mri = *p_mri_context & 0x1;
+    int exit_via_mri = *p_mri_context & 0x2;
     struct __metal_driver_cpu *cpu = __metal_cpu_table[__metal_myhart_id()];
 
     __asm__ volatile("csrr %0, mcause" : "=r"(mcause));
