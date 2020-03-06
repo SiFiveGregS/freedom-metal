@@ -58,24 +58,51 @@ mri_exception_entry:
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
 	andi t1, t1, 1
 	beq zero, t1, 2f
-	// this must be a recursive entry; save mepc, mcause, mstatus in a separate place from the non-reentrant values
+	// this must be a recursive entry; save mepc, mcause, mstatus in a separate place from the non-reentrant values,
+	//  advance past the trapping instruction, return
 
 	// set reentered flag
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)	
-	ori t1, t1, 8
+	ori t1, t1, 4
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)	
-	
-	csrr t1, mepc
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)
 
 	csrr t1, mcause
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)	
 
 	csrr t1, mstatus
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)	
-	
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)
 
-	j 1f	
+	csrr t1, mepc
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)
+
+	// advance MEPC past the current instruction,
+	// restore all other registers this routine has clobbered,
+	// return from this handler
+
+	// MEPC is still in t1.  Figure out if it is pointing at a 16-bit or 32-bit instruction.
+	// 32-bit instructions have '1' as least significant 2 bits of first halfword parcel	
+	lh t0, 0(t1)
+	andi t0, t0, 0x1
+	beq t0, zero, inst_16
+	lh t0, 0(t1)
+	andi t0, t0, 0x2
+	beq t0, zero, inst_16
+	// If we get here, it is a 32-bit instruction.  MEPC still in t1.
+	// Advance it by 4
+	addi t1, t1, 4
+	j advance_mepc
+inst_16:
+	// if we get here, it is a 16-bit instruction	  MEPC still in t1.
+	// Advance it by 2
+	addi t1, t1, 2
+advance_mepc:
+	csrw mepc, t1
+	// restore clobbered registers
+	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
+	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
+	addi sp, sp, ENTRY_STACK_FRAME_SIZE_BYTES
+	mret
+
 
 2:	
 	// set active flag in context, clear all other flags
@@ -141,7 +168,6 @@ mri_exception_entry:
 	REGISTER_STORE x30, ELEMENT_TO_OFFSET(30)(t0)
 	REGISTER_STORE x31, ELEMENT_TO_OFFSET(31)(t0)
 
-1:
 	// cleanup; restore t1, t0, sp	
 	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
 	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
@@ -159,13 +185,6 @@ mri_exception_exit:
 
 	// Borrow t0 to hold pointer to register context that we'll get the register values from
 	la t0, __mriRiscVState
-
-#if 0	
-	// borrow t1 to hold flags, branch past the context restore logic if debug not active
-	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
-	andi t1, t1, 1
-	beq zero, t1, 1f
-#endif	
 
 	// clear active flag in context
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
@@ -224,16 +243,6 @@ mri_exception_exit:
 
 	//  Register t0 gets restored last since we have needed its borrowed value up until this point
 	REGISTER_LOAD t0, ELEMENT_TO_OFFSET(5)(t0)	
-#if 0	
-	j 2f  // skip the next cleanup section because that section only applies if we did not restore the register context
-	
-1:
-	// This section only runs if we did NOT restore register from the saved context
-	// cleanup; restore t1, t0, sp	
-	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
-	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
-	addi sp, sp, ENTRY_STACK_NUM_ELEMENTS*REGISTER_SIZE
-#endif
 .global mri_exception_mret  // declaring this as a global just so we can set a breakpoint more easily to debug
 mri_exception_mret:	
 	mret
