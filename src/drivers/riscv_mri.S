@@ -52,7 +52,7 @@ mri_exception_entry:
 	REGISTER_STORE t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)
 
 	// Borrow t0 to hold pointer to register context that we'll fill up
-	la t0, mri_context
+	la t0, __mriRiscVState
 
 	// borrow t1 to hold flags, branch past the context save logic if debug is already active
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
@@ -158,7 +158,7 @@ mri_exception_exit:
 	REGISTER_STORE t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)
 
 	// Borrow t0 to hold pointer to register context that we'll get the register values from
-	la t0, mri_context
+	la t0, __mriRiscVState
 
 #if 0	
 	// borrow t1 to hold flags, branch past the context restore logic if debug not active

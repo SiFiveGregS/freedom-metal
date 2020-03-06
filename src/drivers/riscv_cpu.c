@@ -174,8 +174,8 @@ void __metal_original_exception_handler(void) {
     void *priv;
     uintptr_t mcause, mepc, mtval, mtvec;
     struct __metal_driver_riscv_cpu_intc *intc;
-    extern int mri_context;
-    int *p_mri_context = (int*)&mri_context;
+    extern int __mriRiscVState;
+    int *p_mri_context = (int*)&__mriRiscVState;
     int exit_via_mri = *p_mri_context & 0x2;
     struct __metal_driver_cpu *cpu = __metal_cpu_table[__metal_myhart_id()];
 
