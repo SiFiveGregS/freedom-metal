@@ -82,11 +82,9 @@ mri_exception_entry:
 	// MEPC is still in t1.  Figure out if it is pointing at a 16-bit or 32-bit instruction.
 	// 32-bit instructions have '1' as least significant 2 bits of first halfword parcel	
 	lh t0, 0(t1)
-	andi t0, t0, 0x1
-	beq t0, zero, inst_16
-	lh t0, 0(t1)
-	andi t0, t0, 0x2
-	beq t0, zero, inst_16
+	andi t0, t0, 0x3
+	slti t0, t0, 0x3  // t0 = t0 < 3
+	bne t0, zero, inst_16
 	// If we get here, it is a 32-bit instruction.  MEPC still in t1.
 	// Advance it by 4
 	addi t1, t1, 4
@@ -177,14 +175,14 @@ advance_mepc:
 
 .global mri_exception_exit
 mri_exception_exit:
-	addi sp, sp, -ENTRY_STACK_NUM_ELEMENTS*REGISTER_SIZE
-
-	// Save t0 and t1 values, so we can use those registers temporarily
-	REGISTER_STORE t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
-	REGISTER_STORE t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)
-
-	// Borrow t0 to hold pointer to register context that we'll get the register values from
+	// Borrow t0 to hold pointer to register context that we'll get the register values from.
+	// Don't need to save the current value of t0, because we're about to restore its value from
+	// the entry context (and we're committed to restoring it).
 	la t0, __mriRiscVState
+
+	// Borrow t1 to clear active flag in context, and to restore MEPC from context.
+	// Don't need to save the current value of t1, because we're about to restore its value from
+	// the entry context (and we're committed to restoring it).
 
 	// clear active flag in context
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
@@ -194,6 +192,12 @@ mri_exception_exit:
 	// Restore MEPC, and do it now, while we still have access to t1 before it gets restored
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(32)(t0)		
 	csrw mepc, t1
+
+	// Restore MSTATUS, and do it now, while we still have access to t1 before it gets restored.
+	// It is crucial to restore MSTATUS because it might have been clobbered by nested exception
+	// that happened when the handler was running (which does happen for any faulting memory access)
+	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(34)(t0)		
+	csrw mstatus, t1
 
 	// restore x1/ra from context
 	REGISTER_LOAD x1, ELEMENT_TO_OFFSET(1)(t0)

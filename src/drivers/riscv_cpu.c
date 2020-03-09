@@ -176,7 +176,7 @@ void __metal_original_exception_handler(void) {
     struct __metal_driver_riscv_cpu_intc *intc;
     extern int __mriRiscVState;
     int *p_mri_context = (int*)&__mriRiscVState;
-    int exit_via_mri = *p_mri_context & 0x2;
+    int exit_via_mri = 0;
     struct __metal_driver_cpu *cpu = __metal_cpu_table[__metal_myhart_id()];
 
     __asm__ volatile("csrr %0, mcause" : "=r"(mcause));
@@ -193,6 +193,7 @@ void __metal_original_exception_handler(void) {
                 ((mtvec & METAL_MTVEC_MASK) == METAL_MTVEC_DIRECT)) {
                 priv = intc->metal_int_table[id].exint_data;
                 intc->metal_int_table[id].handler(id, priv);
+		exit_via_mri = *p_mri_context & 0x2;		
 		if (exit_via_mri) {
 		  __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
 		}
@@ -206,6 +207,7 @@ void __metal_original_exception_handler(void) {
                 priv = intc->metal_int_table[METAL_INTERRUPT_ID_SW].sub_int;
                 mtvt_handler = (metal_interrupt_handler_t) * (uintptr_t *)mtvt;
                 mtvt_handler(id, priv);
+		exit_via_mri = *p_mri_context & 0x2;		
 		if (exit_via_mri) {
 		  __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
 		}
@@ -216,6 +218,7 @@ void __metal_original_exception_handler(void) {
         }
     }
 
+    exit_via_mri = *p_mri_context & 0x2;		    
     if (exit_via_mri) {
       __asm__ volatile("j mri_exception_exit");  /* This will then restore registers and execute an MRET */
     }
