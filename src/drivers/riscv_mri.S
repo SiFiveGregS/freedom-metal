@@ -47,14 +47,14 @@ typedef struct {
 mri_exception_entry:
 	addi sp, sp, -ENTRY_STACK_FRAME_SIZE_BYTES
 
-	// Save t0 and t1 values, so we can use those registers temporarily
+	// Save t0-t2 values, so we can use those registers temporarily
 	REGISTER_STORE t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
 	REGISTER_STORE t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)
+	REGISTER_STORE t2, ENTRY_STACK_ELEM_SP_OFFSET(2)(sp)	
 
 	// Borrow t0 to hold pointer to register context that we'll fill up
 	la t0, __mriRiscVState
 
-	// borrow t1 to hold flags, branch past the context save logic if debug is already active
 	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)
 	andi t1, t1, 1
 	beq zero, t1, 2f
@@ -66,20 +66,27 @@ mri_exception_entry:
 	ori t1, t1, 4
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)	
 
-	csrr t1, mcause
-	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)	
-
 	csrr t1, mstatus
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(37)(t0)
 
 	csrr t1, mepc
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(35)(t0)
 
+	csrr t1, mcause
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(36)(t0)
+
+	// if exception cause was not 0x5 (load access fault)
+	//  then don't mess with MEPC, and skip saving off of registers,
+	//  but stay in the handler chain which will lead to mriDebugException
+	li t2, 0x5
+	bne t1, t2, after_register_save
+
 	// advance MEPC past the current instruction,
 	// restore all other registers this routine has clobbered,
 	// return from this handler
 
-	// MEPC is still in t1.  Figure out if it is pointing at a 16-bit or 32-bit instruction.
+	csrr t1, mepc	
+	// Figure out if MEPC is pointing at a 16-bit or 32-bit instruction.
 	// 32-bit instructions have '1' as least significant 2 bits of first halfword parcel	
 	lh t0, 0(t1)
 	andi t0, t0, 0x3
@@ -96,6 +103,7 @@ inst_16:
 advance_mepc:
 	csrw mepc, t1
 	// restore clobbered registers
+	REGISTER_LOAD t2, ENTRY_STACK_ELEM_SP_OFFSET(2)(sp)		
 	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
 	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
 	addi sp, sp, ENTRY_STACK_FRAME_SIZE_BYTES
@@ -103,8 +111,11 @@ advance_mepc:
 
 
 2:	
-	// set active flag in context, clear all other flags
-	ori t1, zero, 1
+	// set active flag in context, clear the exiting and re-entered flags, but preserve the single stepping flag
+	// so we need to load current value first
+	REGISTER_LOAD t1, ELEMENT_TO_OFFSET(0)(t0)	
+	ori t1, t1, 1 // set active flag
+	andi t1, t1, 0x9 // clear exiting and re-entered flags
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(0)(t0)
 
 	// save MEPC so we can restore even if the debug agent triggers a nested exception
@@ -139,8 +150,12 @@ advance_mepc:
 	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)
 	REGISTER_STORE t1, ELEMENT_TO_OFFSET(6)(t0)
 
+	// save original t2/x7, whose value was saved off (borrow t1 to hold its original value)
+	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(2)(sp)
+	REGISTER_STORE t1, ELEMENT_TO_OFFSET(7)(t0)
+	
+
 	// save the rest of the gprs (values still in place) to context area
-	REGISTER_STORE x7, ELEMENT_TO_OFFSET(7)(t0)
 	REGISTER_STORE x8, ELEMENT_TO_OFFSET(8)(t0)
 	REGISTER_STORE x9, ELEMENT_TO_OFFSET(9)(t0)
 	REGISTER_STORE x10, ELEMENT_TO_OFFSET(10)(t0)
@@ -166,7 +181,9 @@ advance_mepc:
 	REGISTER_STORE x30, ELEMENT_TO_OFFSET(30)(t0)
 	REGISTER_STORE x31, ELEMENT_TO_OFFSET(31)(t0)
 
-	// cleanup; restore t1, t0, sp	
+after_register_save:	
+	// cleanup; restore t2, t1, t0, sp
+	REGISTER_LOAD t2, ENTRY_STACK_ELEM_SP_OFFSET(2)(sp)
 	REGISTER_LOAD t1, ENTRY_STACK_ELEM_SP_OFFSET(1)(sp)	
 	REGISTER_LOAD t0, ENTRY_STACK_ELEM_SP_OFFSET(0)(sp)
 	addi sp, sp, ENTRY_STACK_FRAME_SIZE_BYTES
